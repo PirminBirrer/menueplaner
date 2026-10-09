@@ -26,7 +26,7 @@ Die Installation als App auf dem Handy erfordert **HTTPS** (alle genannten Diens
 
 ## Drucken
 
-Im Plan öffnet das Drucker-Symbol die Druckansicht: Zeitraum wählen (Von/Bis, bis 8 Wochen), «Drucken» klicken. Das Layout ist auf A4 Hochformat ausgelegt, pro Woche ein Block; mit «Als PDF speichern» im Druckdialog entsteht ein PDF.
+Im Plan öffnet das Drucker-Symbol die Druckansicht: Zeitraum wählen (Von/Bis, bis 8 Wochen), «Drucken» klicken. Wählbar sind **Querformat** (Standard; Tage als Spalten, eine Woche pro Seite) und **Hochformat** (Tage als Zeilen, pro Woche ein Block); das Layout ist auf A4 ausgelegt; mit «Als PDF speichern» im Druckdialog entsteht ein PDF.
 
 ## Daten & Backup
 

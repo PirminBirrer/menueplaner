@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../data/db'
 import type { Slot } from '../data/types'
 import { addDays, fromISO, isoWeek, startOfWeek, todayISO } from '../lib/dates'
+import { tagColor, tagTint } from '../lib/tags'
 
-const SLOTS: { slot: Slot; label: string }[] = [
-  { slot: 'lunch', label: 'Mittagessen' },
-  { slot: 'dinner', label: 'Abendessen' },
+const SLOTS: { slot: Slot; label: string; short: string }[] = [
+  { slot: 'lunch', label: 'Mittagessen', short: 'Mittag' },
+  { slot: 'dinner', label: 'Abendessen', short: 'Abend' },
 ]
 const MAX_DAYS = 8 * 7
 
@@ -25,6 +26,21 @@ export default function PrintPage() {
   const [from, setFrom] = useState(params.get('from') ?? thisWeek)
   const [to, setTo] = useState(params.get('to') ?? addDays(thisWeek, 6))
   const [showServings, setShowServings] = useState(true)
+  const [landscape, setLandscape] = useState(() => {
+    try {
+      return localStorage.getItem('print-orientation') !== 'portrait'
+    } catch {
+      return true
+    }
+  })
+  const chooseOrientation = (l: boolean) => {
+    setLandscape(l)
+    try {
+      localStorage.setItem('print-orientation', l ? 'landscape' : 'portrait')
+    } catch {
+      /* Speichern ist optional */
+    }
+  }
 
   const valid = !!from && !!to && from <= to
   const days = useMemo(() => (valid ? rangeDays(from, to) : []), [from, to, valid])
@@ -41,6 +57,11 @@ export default function PrintPage() {
     return [...map.entries()]
   }, [days])
 
+  const cellFor = (d: string, slot: Slot) => {
+    const entry = entries?.find((x) => x.date === d && x.slot === slot)
+    return { entry, dish: entry && dishMap.get(entry.dishId) }
+  }
+
   const presets = [
     { label: 'Diese Woche', from: thisWeek, to: addDays(thisWeek, 6) },
     { label: 'Nächste Woche', from: addDays(thisWeek, 7), to: addDays(thisWeek, 13) },
@@ -49,7 +70,7 @@ export default function PrintPage() {
   const planned = entries?.length ?? 0
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={`print-root mx-auto ${landscape ? 'max-w-5xl' : 'max-w-3xl'}`}>
       <div className="no-print mb-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-bold">Wochenplan drucken</h1>
@@ -66,6 +87,11 @@ export default function PrintPage() {
           <label className="flex flex-col gap-1 text-sm font-medium">Von<input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-sm font-medium">Bis<input type="date" className="input" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
         </div>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Seitenformat">
+          <span className="text-sm font-medium">Format:</span>
+          <button className="chip" aria-pressed={landscape} onClick={() => chooseOrientation(true)}>↔ Querformat</button>
+          <button className="chip" aria-pressed={!landscape} onClick={() => chooseOrientation(false)}>↕ Hochformat</button>
+        </div>
         <label className="flex min-h-10 items-center gap-3 text-sm">
           <input type="checkbox" className="h-5 w-5" checked={showServings} onChange={(e) => setShowServings(e.target.checked)} />
           Portionen anzeigen
@@ -79,7 +105,9 @@ export default function PrintPage() {
         </div>
       </div>
 
-      <div className="print-sheet">
+      <style>{`@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }`}</style>
+      <div className={landscape ? 'overflow-x-auto' : undefined}>
+      <div className={`print-sheet ${landscape ? 'is-land' : ''}`}>
         <header className="print-header">
           <h2>Wochenplan</h2>
           {valid && (
@@ -89,7 +117,50 @@ export default function PrintPage() {
           )}
         </header>
 
-        {weeks.map(([weekStart, weekDaysList]) => (
+        {weeks.map(([weekStart, weekDaysList]) =>
+          landscape ? (
+            <section key={weekStart} className="print-week print-land">
+              <h3>
+                KW {isoWeek(weekStart)}
+                <span>
+                  {longDate(weekDaysList[0], { day: 'numeric', month: 'long' })} – {longDate(weekDaysList[weekDaysList.length - 1], { day: 'numeric', month: 'long' })}
+                </span>
+              </h3>
+              <div className="land-grid" style={{ '--n': weekDaysList.length } as CSSProperties}>
+                <span className="land-corner" />
+                {weekDaysList.map((d) => (
+                  <div key={d} className="land-head">
+                    <strong>{longDate(d, { weekday: 'long' })}</strong>
+                    <span>{longDate(d, { day: 'numeric', month: 'numeric' })}</span>
+                  </div>
+                ))}
+                {SLOTS.map((s) => (
+                  <Fragment key={s.slot}>
+                    <div className="land-label">{s.short}</div>
+                    {weekDaysList.map((d) => {
+                      const { entry, dish } = cellFor(d, s.slot)
+                      const first = dish?.tags[0]
+                      const weekend = [0, 6].includes(fromISO(d).getDay())
+                      return (
+                        <div
+                          key={d}
+                          className={`land-cell ${weekend && !entry ? 'print-weekend' : ''}`}
+                          style={entry ? { borderTopColor: first ? tagColor(first) : 'var(--p-accent)', background: first ? tagTint(first) : 'var(--p-soft)' } : undefined}
+                        >
+                          {entry && (
+                            <>
+                              <span className="print-dish land-dish">{dish?.name ?? '(gelöscht)'}</span>
+                              {showServings && <span className="print-servings">{entry.servings} Portionen</span>}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </Fragment>
+                ))}
+              </div>
+            </section>
+          ) : (
           <section key={weekStart} className="print-week">
             <h3>
               KW {isoWeek(weekStart)}
@@ -129,9 +200,11 @@ export default function PrintPage() {
               )
             })}
           </section>
-        ))}
+        )
+        )}
 
         <footer className="print-footer">Menüplaner · gedruckt am {longDate(todayISO(), { day: 'numeric', month: 'long', year: 'numeric' })}</footer>
+      </div>
       </div>
     </div>
   )

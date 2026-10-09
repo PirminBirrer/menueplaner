@@ -61,6 +61,7 @@ body {
   --p-line: #d9ded9;
   --p-accent: #16a34a;
   --p-soft: #ecfdf3;
+  --surface: #fff;
   background: #fff;
   color: var(--p-ink);
   border-radius: 0.75rem;
@@ -90,10 +91,25 @@ body {
 .print-servings { font-size: 8pt; color: var(--p-muted); margin-top: 0.5mm; }
 .print-footer { margin-top: 4mm; font-size: 8pt; color: var(--p-muted); text-align: right; }
 
-@page { size: A4 portrait; margin: 10mm; }
+/* Querformat: Tage als Spalten, Mittag/Abend als Zeilen */
+.print-sheet.is-land { min-width: 277mm; }
+.print-land { break-inside: avoid; }
+.print-land + .print-land { break-before: page; margin-top: 0; }
+.land-grid { display: grid; grid-template-columns: 19mm repeat(var(--n), minmax(0, 1fr)); }
+.land-head { background: var(--p-accent); color: #fff; padding: 2mm; text-align: center; display: flex; flex-direction: column; border-left: 0.3mm solid rgba(255, 255, 255, 0.4); }
+.land-head strong { font-size: 10.5pt; }
+.land-head span { font-size: 8.5pt; opacity: 0.85; }
+.land-corner { background: var(--p-accent); border-radius: 2mm 0 0 0; }
+.land-head:last-child { border-radius: 0 2mm 0 0; }
+.land-label { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 8pt; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--p-accent); background: var(--p-soft); border-bottom: 0.3mm solid var(--p-line); padding: 1mm; overflow-wrap: anywhere; }
+.land-cell { min-height: 58mm; padding: 2.5mm; display: flex; flex-direction: column; gap: 1.5mm; border-top: 1.2mm solid transparent; border-bottom: 0.3mm solid var(--p-line); border-left: 0.3mm solid var(--p-line); min-width: 0; }
+.land-cell:last-child { border-right: 0.3mm solid var(--p-line); }
+.land-dish { font-size: 10.5pt; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
+
 @media print {
   nav, .no-print { display: none !important; }
   html, body, #root, #root > div, main { height: auto !important; overflow: visible !important; display: block !important; background: #fff !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
-  .print-sheet { border: 0; border-radius: 0; padding: 0; }
+  .print-root { max-width: none !important; }
+  .print-sheet, .print-sheet.is-land { border: 0; border-radius: 0; padding: 0; min-width: 0; }
   .print-row, .print-grid-head { break-inside: avoid; }
 }
