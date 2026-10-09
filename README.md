@@ -19,7 +19,7 @@ npm run preview    # Build lokal ansehen
 Die App ist rein statisch (`dist/`), es gibt kein Backend.
 
 - **Netlify / Vercel / Cloudflare Pages:** Repo verbinden, Build-Befehl `npm run build`, Ausgabeordner `dist`. Für Client-Routing eine Fallback-Regel auf `index.html` setzen (Netlify: Datei `public/_redirects` mit `/* /index.html 200`).
-- **GitHub Pages:** `dist/` veröffentlichen; Fallback `404.html` = Kopie von `index.html`.
+- **GitHub Pages:** Der Workflow `.github/workflows/deploy.yml` baut bei jedem Push auf `main`/`master` und veröffentlicht automatisch. Einmalig in den Repo-Einstellungen unter *Settings → Pages → Source* **GitHub Actions** wählen. Die App läuft dann unter `https://<benutzer>.github.io/<repo-name>/` (Base-Pfad wird über `BASE_PATH` gesetzt; `404.html` ist eine Kopie von `index.html` für Deep-Links).
 - **Eigener Server:** `dist/` mit nginx o. Ä. ausliefern (`try_files $uri /index.html;`).
 
 Die Installation als App auf dem Handy erfordert **HTTPS** (alle genannten Dienste liefern das). Danach im Browser-Menü «Zur Startseite hinzufügen» / «App installieren».
