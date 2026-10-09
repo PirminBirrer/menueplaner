@@ -2,8 +2,8 @@ import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../data/db'
-import type { Slot } from '../data/types'
-import { addDays, fromISO, isoWeek, startOfWeek, todayISO } from '../lib/dates'
+import type { Dish, Slot } from '../data/types'
+import { addDays, fromISO, startOfWeek, todayISO } from '../lib/dates'
 import { tagColor, tagTint } from '../lib/tags'
 
 const SLOTS: { slot: Slot; label: string; short: string }[] = [
@@ -11,8 +11,10 @@ const SLOTS: { slot: Slot; label: string; short: string }[] = [
   { slot: 'dinner', label: 'Abendessen', short: 'Abend' },
 ]
 const MAX_DAYS = 8 * 7
+const COLS_LANDSCAPE = 7
 
 const longDate = (iso: string, opts: Intl.DateTimeFormatOptions) => fromISO(iso).toLocaleDateString('de-CH', opts)
+const isWeekend = (iso: string) => [0, 6].includes(fromISO(iso).getDay())
 
 function rangeDays(from: string, to: string): string[] {
   const out: string[] = []
@@ -20,12 +22,32 @@ function rangeDays(from: string, to: string): string[] {
   return out
 }
 
+function chunk<T>(list: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size))
+  return out
+}
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* Speichern ist optional */
+  }
+}
+
 export default function PrintPage() {
   const [params] = useSearchParams()
   const thisWeek = startOfWeek(todayISO())
   const [from, setFrom] = useState(params.get('from') ?? thisWeek)
   const [to, setTo] = useState(params.get('to') ?? addDays(thisWeek, 6))
-  const [showServings, setShowServings] = useState(true)
+  const [showSteps, setShowSteps] = useState(() => {
+    try {
+      return localStorage.getItem('print-steps') !== 'off'
+    } catch {
+      return true
+    }
+  })
   const [landscape, setLandscape] = useState(() => {
     try {
       return localStorage.getItem('print-orientation') !== 'portrait'
@@ -33,34 +55,20 @@ export default function PrintPage() {
       return true
     }
   })
-  const chooseOrientation = (l: boolean) => {
-    setLandscape(l)
-    try {
-      localStorage.setItem('print-orientation', l ? 'landscape' : 'portrait')
-    } catch {
-      /* Speichern ist optional */
-    }
-  }
 
   const valid = !!from && !!to && from <= to
   const days = useMemo(() => (valid ? rangeDays(from, to) : []), [from, to, valid])
   const entries = useLiveQuery(() => (valid ? db.plan.where('date').between(from, to, true, true).toArray() : []), [from, to, valid])
   const dishes = useLiveQuery(() => db.dishes.toArray(), [])
   const dishMap = useMemo(() => new Map((dishes ?? []).map((d) => [d.id, d])), [dishes])
-
-  const weeks = useMemo(() => {
-    const map = new Map<string, string[]>()
-    for (const d of days) {
-      const w = startOfWeek(d)
-      map.set(w, [...(map.get(w) ?? []), d])
-    }
-    return [...map.entries()]
-  }, [days])
+  const pages = useMemo(() => chunk(days, COLS_LANDSCAPE), [days])
 
   const cellFor = (d: string, slot: Slot) => {
     const entry = entries?.find((x) => x.date === d && x.slot === slot)
-    return { entry, dish: entry && dishMap.get(entry.dishId) }
+    return entry ? { entry, dish: dishMap.get(entry.dishId) } : null
   }
+
+  const steps = (dish?: Dish) => (showSteps && dish?.steps ? dish.steps : undefined)
 
   const presets = [
     { label: 'Diese Woche', from: thisWeek, to: addDays(thisWeek, 6) },
@@ -89,12 +97,17 @@ export default function PrintPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Seitenformat">
           <span className="text-sm font-medium">Format:</span>
-          <button className="chip" aria-pressed={landscape} onClick={() => chooseOrientation(true)}>↔ Querformat</button>
-          <button className="chip" aria-pressed={!landscape} onClick={() => chooseOrientation(false)}>↕ Hochformat</button>
+          <button className="chip" aria-pressed={landscape} onClick={() => { setLandscape(true); remember('print-orientation', 'landscape') }}>↔ Querformat</button>
+          <button className="chip" aria-pressed={!landscape} onClick={() => { setLandscape(false); remember('print-orientation', 'portrait') }}>↕ Hochformat</button>
         </div>
         <label className="flex min-h-10 items-center gap-3 text-sm">
-          <input type="checkbox" className="h-5 w-5" checked={showServings} onChange={(e) => setShowServings(e.target.checked)} />
-          Portionen anzeigen
+          <input
+            type="checkbox"
+            className="h-5 w-5"
+            checked={showSteps}
+            onChange={(e) => { setShowSteps(e.target.checked); remember('print-steps', e.target.checked ? 'on' : 'off') }}
+          />
+          Zubereitung beim Menü mitdrucken
         </label>
         {!valid && <p className="text-sm text-amber-600">Bitte einen gültigen Zeitraum wählen (Von vor Bis).</p>}
         {valid && days.length >= MAX_DAYS && <p className="text-sm text-amber-600">Es werden höchstens 8 Wochen gedruckt.</p>}
@@ -107,104 +120,91 @@ export default function PrintPage() {
 
       <style>{`@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }`}</style>
       <div className={landscape ? 'overflow-x-auto' : undefined}>
-      <div className={`print-sheet ${landscape ? 'is-land' : ''}`}>
-        <header className="print-header">
-          <h2>Wochenplan</h2>
-          {valid && (
-            <p>
-              {longDate(from, { day: 'numeric', month: 'long' })} – {longDate(to, { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          )}
-        </header>
+        <div className={`print-sheet ${landscape ? 'is-land' : ''}`}>
+          <header className="print-header">
+            <h2>Wochenplan</h2>
+            {valid && (
+              <p>
+                {longDate(from, { day: 'numeric', month: 'long' })} – {longDate(to, { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+          </header>
 
-        {weeks.map(([weekStart, weekDaysList]) =>
-          landscape ? (
-            <section key={weekStart} className="print-week print-land">
-              <h3>
-                KW {isoWeek(weekStart)}
-                <span>
-                  {longDate(weekDaysList[0], { day: 'numeric', month: 'long' })} – {longDate(weekDaysList[weekDaysList.length - 1], { day: 'numeric', month: 'long' })}
-                </span>
-              </h3>
-              <div className="land-grid" style={{ '--n': weekDaysList.length } as CSSProperties}>
-                <span className="land-corner" />
-                {weekDaysList.map((d) => (
-                  <div key={d} className="land-head">
-                    <strong>{longDate(d, { weekday: 'long' })}</strong>
-                    <span>{longDate(d, { day: 'numeric', month: 'numeric' })}</span>
-                  </div>
-                ))}
-                {SLOTS.map((s) => (
-                  <Fragment key={s.slot}>
-                    <div className="land-label">{s.short}</div>
-                    {weekDaysList.map((d) => {
-                      const { entry, dish } = cellFor(d, s.slot)
-                      const first = dish?.tags[0]
-                      const weekend = [0, 6].includes(fromISO(d).getDay())
+          {landscape ? (
+            pages.map((pageDays) => (
+              <section key={pageDays[0]} className="print-land">
+                <div className="land-grid" style={{ '--n': pageDays.length } as CSSProperties}>
+                  <span className="land-corner" />
+                  {pageDays.map((d) => (
+                    <div key={d} className="land-head">
+                      <strong>{longDate(d, { weekday: 'long' })}</strong>
+                      <span>{longDate(d, { day: 'numeric', month: 'numeric' })}</span>
+                    </div>
+                  ))}
+                  {SLOTS.map((s) => (
+                    <Fragment key={s.slot}>
+                      <div className="land-label">{s.short}</div>
+                      {pageDays.map((d) => {
+                        const cell = cellFor(d, s.slot)
+                        const first = cell?.dish?.tags[0]
+                        return (
+                          <div
+                            key={d}
+                            className={`land-cell ${isWeekend(d) && !cell ? 'print-weekend' : ''}`}
+                            style={cell ? { borderTopColor: first ? tagColor(first) : 'var(--p-accent)', background: first ? tagTint(first) : 'var(--p-soft)' } : undefined}
+                          >
+                            {cell && (
+                              <>
+                                <span className="print-dish land-dish">{cell.dish?.name ?? '(gelöscht)'}</span>
+                                {steps(cell.dish) && <span className="print-steps land-steps">{steps(cell.dish)}</span>}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </Fragment>
+                  ))}
+                </div>
+              </section>
+            ))
+          ) : (
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th />
+                  {SLOTS.map((s) => (
+                    <th key={s.slot}>{s.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {days.map((d) => (
+                  <tr key={d} className={isWeekend(d) ? 'print-weekend' : undefined}>
+                    <th scope="row" className="print-day">
+                      <strong>{longDate(d, { weekday: 'long' })}</strong>
+                      <span>{longDate(d, { day: 'numeric', month: 'numeric' })}</span>
+                    </th>
+                    {SLOTS.map((s) => {
+                      const cell = cellFor(d, s.slot)
                       return (
-                        <div
-                          key={d}
-                          className={`land-cell ${weekend && !entry ? 'print-weekend' : ''}`}
-                          style={entry ? { borderTopColor: first ? tagColor(first) : 'var(--p-accent)', background: first ? tagTint(first) : 'var(--p-soft)' } : undefined}
-                        >
-                          {entry && (
+                        <td key={s.slot}>
+                          {cell && (
                             <>
-                              <span className="print-dish land-dish">{dish?.name ?? '(gelöscht)'}</span>
-                              {showServings && <span className="print-servings">{entry.servings} Portionen</span>}
+                              <span className="print-dish">{cell.dish?.name ?? '(gelöscht)'}</span>
+                              {steps(cell.dish) && <span className="print-steps">{steps(cell.dish)}</span>}
                             </>
                           )}
-                        </div>
+                        </td>
                       )
                     })}
-                  </Fragment>
+                  </tr>
                 ))}
-              </div>
-            </section>
-          ) : (
-          <section key={weekStart} className="print-week">
-            <h3>
-              KW {isoWeek(weekStart)}
-              <span>
-                {longDate(weekDaysList[0], { day: 'numeric', month: 'long' })} – {longDate(weekDaysList[weekDaysList.length - 1], { day: 'numeric', month: 'long' })}
-              </span>
-            </h3>
-            <div className="print-grid print-grid-head">
-              <span />
-              {SLOTS.map((s) => (
-                <span key={s.slot}>{s.label}</span>
-              ))}
-            </div>
-            {weekDaysList.map((d) => {
-              const weekend = [0, 6].includes(fromISO(d).getDay())
-              return (
-                <div key={d} className={`print-grid print-row ${weekend ? 'print-weekend' : ''}`}>
-                  <div className="print-day">
-                    <strong>{longDate(d, { weekday: 'long' })}</strong>
-                    <span>{longDate(d, { day: 'numeric', month: 'numeric' })}</span>
-                  </div>
-                  {SLOTS.map((s) => {
-                    const e = entries?.find((x) => x.date === d && x.slot === s.slot)
-                    const dish = e && dishMap.get(e.dishId)
-                    return (
-                      <div key={s.slot} className="print-cell">
-                        {e && (
-                          <>
-                            <span className="print-dish">{dish?.name ?? '(gelöscht)'}</span>
-                            {showServings && <span className="print-servings">{e.servings} Portionen</span>}
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </section>
-        )
-        )}
+              </tbody>
+            </table>
+          )}
 
-        <footer className="print-footer">Menüplaner · gedruckt am {longDate(todayISO(), { day: 'numeric', month: 'long', year: 'numeric' })}</footer>
-      </div>
+          <footer className="print-footer">Menüplaner · gedruckt am {longDate(todayISO(), { day: 'numeric', month: 'long', year: 'numeric' })}</footer>
+        </div>
       </div>
     </div>
   )

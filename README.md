@@ -26,7 +26,7 @@ Die Installation als App auf dem Handy erfordert **HTTPS** (alle genannten Diens
 
 ## Drucken
 
-Im Plan öffnet das Drucker-Symbol die Druckansicht: Zeitraum wählen (Von/Bis, bis 8 Wochen), «Drucken» klicken. Wählbar sind **Querformat** (Standard; Tage als Spalten, eine Woche pro Seite) und **Hochformat** (Tage als Zeilen, pro Woche ein Block); das Layout ist auf A4 ausgelegt; mit «Als PDF speichern» im Druckdialog entsteht ein PDF.
+Im Plan öffnet das Drucker-Symbol die Druckansicht: Zeitraum wählen (Von/Bis, bis 8 Wochen), «Drucken» klicken. Der gewählte Zeitraum wird durchgehend abgebildet (ohne Aufteilung nach Kalenderwochen). Wählbar sind **Querformat** (Standard; Tage als Spalten, 7 Tage pro Seite) und **Hochformat** (Tage als Zeilen in einer Tabelle); das Layout ist auf A4 ausgelegt. Bei jedem Menü wird auf Wunsch die Zubereitung mitgedruckt. Mit «Als PDF speichern» im Druckdialog entsteht ein PDF.
 
 Auch die Einkaufsliste lässt sich drucken (Drucker-Symbol auf der Einkaufsseite): A4 Hochformat, nach Kategorien in zwei Spalten, mit Kästchen zum Abhaken von Hand; abgehakte Artikel sind standardmässig ausgeblendet.
 
