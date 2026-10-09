@@ -14,7 +14,7 @@ import type { Category, ShopItem } from '../data/types'
 import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
 import { addDays, startOfWeek, todayISO } from '../lib/dates'
-import { formatNumber, formatQuantity, normalizeUnit, parseIngredientLine } from '../lib/units'
+import { formatNumber, formatQuantity, parseIngredientLine, toBase } from '../lib/units'
 
 function GenerateSheet({ onClose }: { onClose: () => void }) {
   const today = todayISO()
@@ -68,11 +68,8 @@ function ItemSheet({ item, categories, onClose }: { item: ShopItem; categories: 
     e.preventDefault()
     if (!name.trim()) return
     const q = qty.trim() ? Number(qty.replace(',', '.')) : undefined
-    await updateItem(item, {
-      name: name.trim(),
-      qty: Number.isFinite(q) ? q : undefined,
-      unit: normalizeUnit(unit) || undefined,
-    })
+    const base = toBase(Number.isFinite(q) ? q : undefined, unit)
+    await updateItem(item, { name: name.trim(), qty: base.qty, unit: base.unit || undefined })
     if (cat !== item.categoryId) await setItemCategory({ ...item, name: name.trim() }, cat)
     onClose()
   }
@@ -123,7 +120,8 @@ export default function ListPage() {
     e.preventDefault()
     if (!text.trim()) return
     const p = parseIngredientLine(text)
-    await addManualItem(p.name, p.qty, p.unit ? normalizeUnit(p.unit) : undefined)
+    const base = toBase(p.qty, p.unit)
+    await addManualItem(p.name, base.qty, base.unit || undefined)
     setText('')
   }
 
