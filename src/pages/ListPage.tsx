@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../data/db'
 import {
   addManualItem,
   clearChecked,
+  closeShoppingList,
   deleteItem,
   generateShoppingList,
   setItemCategory,
@@ -59,6 +61,50 @@ function GenerateSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
+function CloseSheet({ items, onClose }: { items: ShopItem[]; onClose: () => void }) {
+  const unchecked = items.filter((i) => !i.checked).length
+  const [keep, setKeep] = useState(true)
+  const [done, setDone] = useState(false)
+
+  if (done) {
+    return (
+      <Sheet title="Einkauf abgeschlossen" onClose={onClose}>
+        <div className="flex flex-col gap-3 text-center">
+          <p className="text-4xl" aria-hidden>✅</p>
+          <p>Der Einkauf wurde archiviert.</p>
+          <Link to="/liste/archiv" className="btn btn-primary" onClick={onClose}>Zum Archiv</Link>
+          <button className="btn" onClick={onClose}>Schliessen</button>
+        </div>
+      </Sheet>
+    )
+  }
+  return (
+    <Sheet title="Einkauf abschliessen" onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        <p>
+          {items.length} Artikel, davon {items.length - unchecked} abgehakt. Die Liste wird mit dem heutigen Datum im Archiv
+          gespeichert.
+        </p>
+        {unchecked > 0 && (
+          <label className="flex min-h-12 items-center gap-3">
+            <input type="checkbox" className="h-6 w-6" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+            <span>{unchecked} nicht abgehakte Artikel in der Liste behalten</span>
+          </label>
+        )}
+        <button
+          className="btn btn-primary"
+          onClick={async () => {
+            await closeShoppingList(unchecked > 0 && keep)
+            setDone(true)
+          }}
+        >
+          Abschliessen &amp; archivieren
+        </button>
+      </div>
+    </Sheet>
+  )
+}
+
 function ItemSheet({ item, categories, onClose }: { item: ShopItem; categories: Category[]; onClose: () => void }) {
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState(item.qty !== undefined ? String(item.qty).replace('.', ',') : '')
@@ -104,6 +150,7 @@ export default function ListPage() {
   const [text, setText] = useState('')
   const [generating, setGenerating] = useState(false)
   const [editing, setEditing] = useState<ShopItem | null>(null)
+  const [closing, setClosing] = useState(false)
 
   const groups = useMemo(() => {
     if (!items || !categories) return []
@@ -133,13 +180,20 @@ export default function ListPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Einkauf</h1>
-        <button className="btn btn-primary" onClick={() => setGenerating(true)}>Aus Plan erzeugen</button>
+        <Link to="/liste/archiv" className="btn">Archiv</Link>
       </div>
 
       <form onSubmit={add} className="mb-4 flex gap-2">
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Artikel hinzufügen, z. B. 2 l Milch" aria-label="Artikel hinzufügen" enterKeyHint="done" />
         <button className="btn btn-primary btn-icon" aria-label="Hinzufügen" type="submit">+</button>
       </form>
+
+      <div className="mb-4 flex gap-2">
+        <button className="btn btn-primary flex-1" onClick={() => setGenerating(true)}>Aus Plan erzeugen</button>
+        {items.length > 0 && (
+          <button className="btn flex-1" onClick={() => setClosing(true)}>Einkauf abschliessen</button>
+        )}
+      </div>
 
       {items.length === 0 ? (
         <EmptyState icon="🛒" title="Die Liste ist leer" hint="Tippe oben einen Artikel ein oder erzeuge die Liste aus deinem Wochenplan." />
@@ -184,6 +238,7 @@ export default function ListPage() {
         </div>
       )}
 
+      {closing && <CloseSheet items={items} onClose={() => setClosing(false)} />}
       {generating && <GenerateSheet onClose={() => setGenerating(false)} />}
       {editing && <ItemSheet item={editing} categories={categories} onClose={() => setEditing(null)} />}
     </div>

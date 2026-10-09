@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Category, Dish, IngredientCategory, PlanEntry, ShopItem } from './types'
+import type { ArchivedList, Category, Dish, IngredientCategory, PlanEntry, ShopItem } from './types'
 import { DEFAULT_CATEGORIES } from '../lib/categories'
 
 export class AppDB extends Dexie {
@@ -7,6 +7,7 @@ export class AppDB extends Dexie {
   plan!: EntityTable<PlanEntry, 'id'>
   shop!: EntityTable<ShopItem, 'id'>
   categories!: EntityTable<Category, 'id'>
+  archive!: EntityTable<ArchivedList, 'id'>
   ingredientCategories!: EntityTable<IngredientCategory, 'name'>
 
   constructor(name = 'menueplaner') {
@@ -17,6 +18,9 @@ export class AppDB extends Dexie {
       shop: 'id, source, planKey',
       categories: 'id, sortOrder',
       ingredientCategories: 'name',
+    })
+    this.version(2).stores({
+      archive: 'id, closedAt',
     })
     this.on('populate', (tx) => {
       tx.table('categories').bulkAdd(DEFAULT_CATEGORIES)

@@ -42,6 +42,13 @@ export interface ShopItem {
   updatedAt: number
 }
 
+/** Abgeschlossener Einkauf: Momentaufnahme der Liste zum Zeitpunkt des Abschlusses. */
+export interface ArchivedList {
+  id: string
+  closedAt: number
+  items: ShopItem[]
+}
+
 export interface Category {
   id: string
   name: string

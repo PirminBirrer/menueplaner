@@ -121,6 +121,43 @@ export async function generateShoppingList(from: string, to: string) {
   return { added: result.upsert.length, removed: result.deleteIds.length, total: planItems.length }
 }
 
+/**
+ * Schliesst den Einkauf ab: speichert die ganze Liste im Archiv und leert sie.
+ * Mit keepUnchecked bleiben nicht abgehakte Artikel in der aktiven Liste.
+ */
+export async function closeShoppingList(keepUnchecked: boolean): Promise<string | null> {
+  return db.transaction('rw', db.shop, db.archive, async () => {
+    const items = await db.shop.toArray()
+    if (items.length === 0) return null
+    const id = newId()
+    await db.archive.add({ id, closedAt: Date.now(), items })
+    await db.shop.bulkDelete(items.filter((i) => !keepUnchecked || i.checked).map((i) => i.id))
+    return id
+  })
+}
+
+/** Übernimmt alle Artikel eines archivierten Einkaufs als neue, offene Artikel. */
+export async function restoreArchived(id: string): Promise<number> {
+  const entry = await db.archive.get(id)
+  if (!entry) return 0
+  const now = Date.now()
+  await db.shop.bulkAdd(
+    entry.items.map((i) => ({
+      id: newId(),
+      name: i.name,
+      qty: i.qty,
+      unit: i.unit,
+      categoryId: i.categoryId,
+      checked: false,
+      source: 'manual' as const,
+      updatedAt: now,
+    })),
+  )
+  return entry.items.length
+}
+
+export const deleteArchived = (id: string) => db.archive.delete(id)
+
 // ---------- Backup ----------
 export async function exportAll(): Promise<string> {
   const data = {
@@ -129,6 +166,7 @@ export async function exportAll(): Promise<string> {
     plan: await db.plan.toArray(),
     shop: await db.shop.toArray(),
     categories: await db.categories.toArray(),
+    archive: await db.archive.toArray(),
     ingredientCategories: await db.ingredientCategories.toArray(),
   }
   return JSON.stringify(data, null, 2)
@@ -139,19 +177,21 @@ export async function importAll(json: string) {
   if (!data || data.version !== 1 || !Array.isArray(data.dishes)) throw new Error('Ungültige Backup-Datei')
   await db.transaction(
     'rw',
-    [db.dishes, db.plan, db.shop, db.categories, db.ingredientCategories],
+    [db.dishes, db.plan, db.shop, db.categories, db.ingredientCategories, db.archive],
     async () => {
       await Promise.all([
         db.dishes.clear(),
         db.plan.clear(),
         db.shop.clear(),
         db.categories.clear(),
+        db.archive.clear(),
         db.ingredientCategories.clear(),
       ])
       await db.dishes.bulkAdd(data.dishes)
       await db.plan.bulkAdd(data.plan ?? [])
       await db.shop.bulkAdd(data.shop ?? [])
       await db.categories.bulkAdd(data.categories ?? [])
+      await db.archive.bulkAdd(data.archive ?? [])
       await db.ingredientCategories.bulkAdd(data.ingredientCategories ?? [])
     },
   )

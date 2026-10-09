@@ -45,6 +45,7 @@ Ein späterer Sync/Backend ersetzt nur `src/data/repo.ts`; IDs sind UUIDs und al
 - Menüs ohne Rezept erscheinen mit ihrem Namen.
 - Erneutes Erzeugen behält manuelle Artikel, Abhak-Status und manuell geänderte Mengen; nicht mehr benötigte, nicht abgehakte Plan-Einträge werden entfernt.
 - Die Kategorie einer Zutat wird beim Ändern gemerkt.
+- «Einkauf abschliessen» speichert die Liste mit Datum im Archiv (auch im Backup enthalten) und leert sie; nicht abgehakte Artikel können in der Liste bleiben. Im Archiv lassen sich Einkäufe ansehen, erneut verwenden und löschen.
 
 ## Icons
 

@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import MenusPage from './pages/MenusPage'
 import PlanPage from './pages/PlanPage'
 import ListPage from './pages/ListPage'
+import ArchivePage from './pages/ArchivePage'
 import SettingsPage from './pages/SettingsPage'
 
 const tabs = [
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/menus" element={<MenusPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/liste" element={<ListPage />} />
+          <Route path="/liste/archiv" element={<ArchivePage />} />
           <Route path="/einstellungen" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/plan" replace />} />
         </Routes>

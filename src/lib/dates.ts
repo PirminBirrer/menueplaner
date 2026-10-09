@@ -53,3 +53,7 @@ export function dayParts(iso: string): { weekday: string; date: string } {
     date: d.toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric' }),
   }
 }
+
+export function formatLongDate(ts: number): string {
+  return new Date(ts).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
