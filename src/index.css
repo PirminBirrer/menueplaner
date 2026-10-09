@@ -113,3 +113,13 @@ body {
   .print-sheet, .print-sheet.is-land { border: 0; border-radius: 0; padding: 0; min-width: 0; }
   .print-row, .print-grid-head { break-inside: avoid; }
 }
+
+/* Einkaufsliste drucken: Kategorien in zwei Spalten, Kästchen zum Abhaken von Hand */
+.sp-cols { column-width: 70mm; column-gap: 9mm; }
+.sp-group { break-inside: avoid; margin-bottom: 5mm; }
+.sp-group h3 { font-size: 9pt; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--p-accent); border-bottom: 0.4mm solid var(--p-accent); padding-bottom: 1mm; margin-bottom: 1mm; }
+.sp-row { display: flex; align-items: baseline; gap: 2.5mm; padding: 1.6mm 0; border-bottom: 0.25mm dotted var(--p-line); font-size: 11pt; break-inside: avoid; }
+.sp-box { flex: none; width: 4.2mm; height: 4.2mm; border: 0.4mm solid var(--p-ink); border-radius: 0.8mm; font-size: 8pt; line-height: 3.6mm; text-align: center; transform: translateY(0.6mm); }
+.sp-name { flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.sp-qty { flex: none; color: var(--p-muted); font-size: 10pt; white-space: nowrap; }
+.sp-done .sp-name, .sp-done .sp-qty { color: var(--p-muted); text-decoration: line-through; }

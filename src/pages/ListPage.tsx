@@ -185,7 +185,10 @@ export default function ListPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Einkauf</h1>
-        <Link to="/liste/archiv" className="btn">Archiv</Link>
+        <div className="flex gap-2">
+          <Link to="/liste/druck" className="btn btn-icon" aria-label="Einkaufsliste drucken" title="Drucken">🖨️</Link>
+          <Link to="/liste/archiv" className="btn">Archiv</Link>
+        </div>
       </div>
 
       <form onSubmit={add} className="mb-4 flex gap-2">

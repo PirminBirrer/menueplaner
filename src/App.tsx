@@ -4,6 +4,7 @@ import PlanPage from './pages/PlanPage'
 import ListPage from './pages/ListPage'
 import ArchivePage from './pages/ArchivePage'
 import PrintPage from './pages/PrintPage'
+import ShoppingPrintPage from './pages/ShoppingPrintPage'
 import SettingsPage from './pages/SettingsPage'
 
 const tabs = [
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/plan/druck" element={<PrintPage />} />
           <Route path="/liste" element={<ListPage />} />
+          <Route path="/liste/druck" element={<ShoppingPrintPage />} />
           <Route path="/liste/archiv" element={<ArchivePage />} />
           <Route path="/einstellungen" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/plan" replace />} />
