@@ -131,3 +131,12 @@ describe('units', () => {
     expect(parseIngredientLine('Salz')).toEqual({ name: 'Salz' })
   })
 })
+
+describe('guessCategory', () => {
+  it('erkennt Haushaltsartikel vor Lebensmitteln', async () => {
+    const { guessCategory } = await import('./categories')
+    expect(guessCategory('zahnpasta')).toBe('haushalt')
+    expect(guessCategory('spaghetti')).toBe('vorrat')
+    expect(guessCategory('milch')).toBe('milch')
+  })
+})

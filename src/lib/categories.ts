@@ -13,6 +13,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ]
 
 const KEYWORDS: [string, string[]][] = [
+  // Haushalt zuerst, damit z. B. «Zahnpasta» nicht als «Pasta» erkannt wird.
+  ['haushalt', ['zahnpasta', 'seife', 'shampoo', 'putz', 'spülmittel', 'toilettenpapier', 'küchenpapier', 'waschmittel', 'schwamm', 'müllsack', 'windel']],
   ['gemuese', ['tomate', 'zwiebel', 'knoblauch', 'karotte', 'rüebli', 'salat', 'gurke', 'paprika', 'zucchini', 'kartoffel', 'apfel', 'banane', 'zitrone', 'pilz', 'lauch', 'spinat', 'broccoli', 'brokkoli', 'kürbis', 'petersilie', 'basilikum', 'ingwer', 'peperoni']],
   ['milch', ['milch', 'käse', 'butter', 'joghurt', 'rahm', 'quark', 'mozzarella', 'parmesan', 'ei', 'eier', 'sahne', 'mascarpone']],
   ['fleisch', ['fleisch', 'poulet', 'huhn', 'hack', 'lachs', 'fisch', 'schinken', 'speck', 'wurst', 'rind', 'schwein', 'thon', 'crevetten']],
@@ -20,7 +22,6 @@ const KEYWORDS: [string, string[]][] = [
   ['vorrat', ['spaghetti', 'pasta', 'nudel', 'reis', 'zucker', 'salz', 'pfeffer', 'öl', 'essig', 'konserve', 'bohne', 'linsen', 'sauce', 'bouillon', 'gewürz', 'couscous']],
   ['getraenke', ['wasser', 'saft', 'wein', 'bier', 'cola', 'tee', 'kaffee']],
   ['tiefkuehl', ['tiefkühl', 'glace', 'pizza']],
-  ['haushalt', ['zahnpasta', 'seife', 'shampoo', 'putz', 'spülmittel', 'toilettenpapier', 'küchenpapier', 'waschmittel', 'schwamm', 'müllsack', 'windel']],
 ]
 
 /** Einfache Vorbelegung, falls die App die Zutat noch nicht kennt. */

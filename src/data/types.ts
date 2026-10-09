@@ -39,6 +39,8 @@ export interface ShopItem {
   planKey?: string
   /** Vom Benutzer bearbeitet: Menge wird beim erneuten Generieren nicht überschrieben. */
   edited?: boolean
+  /** «Habe ich schon»: ausgeblendet, wird beim erneuten Generieren nicht wieder hinzugefügt. */
+  dismissed?: boolean
   updatedAt: number
 }
 

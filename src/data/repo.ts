@@ -97,6 +97,18 @@ export const toggleItem = (item: ShopItem) =>
 
 export const deleteItem = (id: string) => db.shop.delete(id)
 
+/**
+ * Entfernt einen Artikel von der Liste. Plan-Artikel werden nur ausgeblendet («habe ich schon»),
+ * damit sie beim erneuten Generieren nicht zurückkommen.
+ */
+export const removeItem = (item: ShopItem) =>
+  item.source === 'plan'
+    ? db.shop.update(item.id, { dismissed: true, checked: false, updatedAt: Date.now() })
+    : db.shop.delete(item.id)
+
+export const undismissItem = (item: ShopItem) =>
+  db.shop.update(item.id, { dismissed: false, updatedAt: Date.now() })
+
 export const clearChecked = () => db.shop.filter((i) => i.checked).delete()
 
 /** Erzeugt/aktualisiert die Plan-Einträge der Liste für den Zeitraum [from, to]. */
@@ -127,11 +139,13 @@ export async function generateShoppingList(from: string, to: string) {
  */
 export async function closeShoppingList(keepUnchecked: boolean): Promise<string | null> {
   return db.transaction('rw', db.shop, db.archive, async () => {
-    const items = await db.shop.toArray()
+    const all = await db.shop.toArray()
+    const items = all.filter((i) => !i.dismissed)
     if (items.length === 0) return null
     const id = newId()
     await db.archive.add({ id, closedAt: Date.now(), items })
-    await db.shop.bulkDelete(items.filter((i) => !keepUnchecked || i.checked).map((i) => i.id))
+    const keep = new Set(items.filter((i) => keepUnchecked && !i.checked).map((i) => i.id))
+    await db.shop.bulkDelete(all.filter((i) => !keep.has(i.id)).map((i) => i.id))
     return id
   })
 }

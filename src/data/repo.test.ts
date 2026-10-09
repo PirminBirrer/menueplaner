@@ -1,6 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from './db'
-import { addManualItem, closeShoppingList, deleteArchived, exportAll, importAll, restoreArchived, toggleItem } from './repo'
+import {
+  addManualItem,
+  closeShoppingList,
+  deleteArchived,
+  exportAll,
+  generateShoppingList,
+  importAll,
+  removeItem,
+  restoreArchived,
+  saveDish,
+  assignDish,
+  toggleItem,
+  undismissItem,
+} from './repo'
 
 beforeEach(async () => {
   await Promise.all([db.shop.clear(), db.archive.clear()])
@@ -49,5 +62,47 @@ describe('Archiv', () => {
     await db.archive.clear()
     await importAll(json)
     expect(await db.archive.count()).toBe(1)
+  })
+})
+
+describe('«Habe ich schon»', () => {
+  async function planReis() {
+    await Promise.all([db.dishes.clear(), db.plan.clear(), db.shop.clear()])
+    const id = await saveDish({ name: 'Risotto', tags: [], servings: 2, ingredients: [{ id: 'i', qty: 200, unit: 'g', name: 'Reis' }] })
+    await assignDish('2026-10-12', 'dinner', id)
+    await generateShoppingList('2026-10-12', '2026-10-12')
+    return (await db.shop.toArray())[0]
+  }
+
+  it('blendet Plan-Artikel aus und fügt sie beim erneuten Generieren nicht wieder hinzu', async () => {
+    const reis = await planReis()
+    await removeItem(reis)
+    await generateShoppingList('2026-10-12', '2026-10-12')
+    const all = await db.shop.toArray()
+    expect(all).toHaveLength(1)
+    expect(all[0].dismissed).toBe(true)
+  })
+
+  it('lässt sich zurück auf die Liste holen', async () => {
+    const reis = await planReis()
+    await removeItem(reis)
+    await undismissItem((await db.shop.get(reis.id))!)
+    expect((await db.shop.get(reis.id))!.dismissed).toBe(false)
+  })
+
+  it('löscht manuelle Artikel wirklich', async () => {
+    await db.shop.clear()
+    await addManualItem('Zahnpasta')
+    await removeItem((await db.shop.toArray())[0])
+    expect(await db.shop.count()).toBe(0)
+  })
+
+  it('archiviert ausgeblendete Artikel nicht und räumt sie beim Abschliessen auf', async () => {
+    const reis = await planReis()
+    await addManualItem('Milch')
+    await removeItem(reis)
+    const id = await closeShoppingList(true)
+    expect((await db.archive.get(id!))!.items.map((i) => i.name)).toEqual(['Milch'])
+    expect(await db.shop.filter((i) => !!i.dismissed).count()).toBe(0)
   })
 })

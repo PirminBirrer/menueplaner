@@ -6,10 +6,11 @@ import {
   addManualItem,
   clearChecked,
   closeShoppingList,
-  deleteItem,
+  removeItem,
   generateShoppingList,
   setItemCategory,
   toggleItem,
+  undismissItem,
   updateItem,
 } from '../data/repo'
 import type { Category, ShopItem } from '../data/types'
@@ -136,7 +137,9 @@ function ItemSheet({ item, categories, onClose }: { item: ShopItem; categories: 
           </select>
         </label>
         <div className="flex gap-2">
-          <button type="button" className="btn btn-danger" onClick={async () => { await deleteItem(item.id); onClose() }}>Löschen</button>
+          <button type="button" className="btn btn-danger" onClick={async () => { await removeItem(item); onClose() }}>
+            {item.source === 'plan' ? 'Habe ich schon' : 'Löschen'}
+          </button>
           <button type="submit" className="btn btn-primary flex-1">Speichern</button>
         </div>
       </form>
@@ -145,7 +148,9 @@ function ItemSheet({ item, categories, onClose }: { item: ShopItem; categories: 
 }
 
 export default function ListPage() {
-  const items = useLiveQuery(() => db.shop.toArray(), [])
+  const allItems = useLiveQuery(() => db.shop.toArray(), [])
+  const items = useMemo(() => allItems?.filter((i) => !i.dismissed), [allItems])
+  const dismissed = useMemo(() => allItems?.filter((i) => i.dismissed) ?? [], [allItems])
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
   const [text, setText] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -195,7 +200,7 @@ export default function ListPage() {
         )}
       </div>
 
-      {items.length === 0 ? (
+      {items.length === 0 && dismissed.length === 0 ? (
         <EmptyState icon="🛒" title="Die Liste ist leer" hint="Tippe oben einen Artikel ein oder erzeuge die Liste aus deinem Wochenplan." />
       ) : (
         <div className="flex flex-col gap-4">
@@ -225,11 +230,36 @@ export default function ListPage() {
                         <span className="muted ml-2 text-sm">{i.qty !== undefined ? formatQuantity(i.qty, i.unit) : i.unit}</span>
                       )}
                     </button>
+                    {i.source === 'plan' && !i.checked && (
+                      <button
+                        className="muted min-h-14 shrink-0 px-3 text-xs"
+                        onClick={() => removeItem(i)}
+                        aria-label={`${i.name} ist schon vorhanden`}
+                      >
+                        Schon da
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             </section>
           ))}
+          {dismissed.length > 0 && (
+            <details className="card px-4 py-2">
+              <summary className="min-h-10 cursor-pointer py-2 font-medium">Schon vorhanden ({dismissed.length})</summary>
+              <ul className="pb-1">
+                {dismissed.map((i) => (
+                  <li key={i.id} className="flex items-center justify-between gap-2 py-1">
+                    <span className="muted">
+                      {i.name}
+                      {i.qty !== undefined && <span className="ml-2 text-sm">{formatQuantity(i.qty, i.unit)}</span>}
+                    </span>
+                    <button className="btn" onClick={() => undismissItem(i)}>Zurück auf Liste</button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {checkedCount > 0 && (
             <button className="btn btn-danger self-center" onClick={() => clearChecked()}>
               {formatNumber(checkedCount)} abgehakte entfernen
