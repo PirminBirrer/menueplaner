@@ -53,3 +53,47 @@ body {
   }
   .chip[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
 }
+
+/* ---------- Druckansicht (A4) ---------- */
+.print-sheet {
+  --p-ink: #1c1f1d;
+  --p-muted: #6b726d;
+  --p-line: #d9ded9;
+  --p-accent: #16a34a;
+  --p-soft: #ecfdf3;
+  background: #fff;
+  color: var(--p-ink);
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  padding: 8mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.print-header { border-bottom: 3px solid var(--p-accent); padding-bottom: 3mm; margin-bottom: 4mm; display: flex; align-items: baseline; justify-content: space-between; gap: 8mm; flex-wrap: wrap; }
+.print-header h2 { font-size: 26pt; font-weight: 800; letter-spacing: -0.5px; color: var(--p-accent); line-height: 1.1; }
+.print-header p { font-size: 11pt; color: var(--p-muted); }
+.print-week { margin-bottom: 5mm; break-inside: avoid; }
+.print-week h3 { font-size: 11pt; font-weight: 700; margin-bottom: 1.5mm; display: flex; gap: 3mm; align-items: baseline; }
+.print-week h3 span { font-size: 9pt; font-weight: 400; color: var(--p-muted); }
+.print-grid { display: grid; grid-template-columns: 26mm 1fr 1fr; }
+.print-grid-head span { font-size: 8pt; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #fff; background: var(--p-accent); padding: 1.2mm 2.5mm; }
+.print-grid-head span:first-child { border-radius: 2mm 0 0 0; }
+.print-grid-head span:last-child { border-radius: 0 2mm 0 0; }
+.print-row { border-bottom: 0.3mm solid var(--p-line); min-height: 14mm; }
+.print-weekend { background: var(--p-soft); }
+.print-day { display: flex; flex-direction: column; justify-content: center; padding: 1.5mm 2.5mm; border-right: 0.3mm solid var(--p-line); }
+.print-day strong { font-size: 10pt; }
+.print-day span { font-size: 8pt; color: var(--p-muted); }
+.print-cell { display: flex; flex-direction: column; justify-content: center; padding: 1.5mm 2.5mm; border-right: 0.3mm solid var(--p-line); min-width: 0; }
+.print-cell:last-child { border-right: 0; }
+.print-dish { font-size: 11.5pt; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.print-servings { font-size: 8pt; color: var(--p-muted); margin-top: 0.5mm; }
+.print-footer { margin-top: 4mm; font-size: 8pt; color: var(--p-muted); text-align: right; }
+
+@page { size: A4 portrait; margin: 10mm; }
+@media print {
+  nav, .no-print { display: none !important; }
+  html, body, #root, #root > div, main { height: auto !important; overflow: visible !important; display: block !important; background: #fff !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .print-sheet { border: 0; border-radius: 0; padding: 0; }
+  .print-row, .print-grid-head { break-inside: avoid; }
+}

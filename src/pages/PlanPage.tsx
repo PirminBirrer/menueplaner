@@ -263,9 +263,10 @@ export default function PlanPage() {
         <button className="btn btn-icon" aria-label="Vorherige Woche" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
         <div className="flex-1 text-center leading-tight">
           <h1 className="text-lg font-bold">KW {isoWeek(weekStart)}</h1>
-          <p className="muted text-xs">{formatRange(days[0], days[6])}</p>
+          <p className="muted text-xs whitespace-nowrap">{formatRange(days[0], days[6])}</p>
         </div>
         <button className="chip" onClick={() => setWeekStart(startOfWeek(todayISO()))}>Heute</button>
+        <Link to={`/plan/druck?from=${days[0]}&to=${days[6]}`} className="chip !px-2.5" aria-label="Wochenplan drucken" title="Drucken">🖨️</Link>
         <button className="btn btn-icon" aria-label="Nächste Woche" onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>
       </div>
 

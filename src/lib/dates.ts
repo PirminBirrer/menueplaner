@@ -33,7 +33,7 @@ export function formatDay(iso: string): string {
 }
 
 export function formatRange(a: string, b: string): string {
-  const f = (s: string) => fromISO(s).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })
+  const f = (s: string) => fromISO(s).toLocaleDateString('de-CH', { day: 'numeric', month: 'short' })
   return `${f(a)} – ${f(b)}`
 }
 
