@@ -20,6 +20,7 @@ import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
 import { TagDots, TagFilter, useDishFilter } from '../components/DishFilter'
 import { tagColor, tagTint } from '../lib/tags'
+import { formatNumber } from '../lib/units'
 import { addDays, dayParts, formatDay, fromISO, formatRange, isoWeek, startOfWeek, todayISO, weekDays } from '../lib/dates'
 
 const SLOTS: Slot[] = ['lunch', 'dinner']
@@ -73,8 +74,77 @@ function DishPicker({ onPick, onClose }: { onPick: (d: Dish) => void; onClose: (
   )
 }
 
+function RecipeSheet({ dish, servings, onClose }: { dish: Dish; servings?: number; onClose: () => void }) {
+  const base = dish.servings && dish.servings > 0 ? dish.servings : undefined
+  const [portions, setPortions] = useState(servings ?? base ?? 2)
+  const factor = base ? portions / base : 1
+  const hasRecipe = dish.ingredients.length > 0 || !!dish.steps
+
+  return (
+    <Sheet title={dish.name} onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        {dish.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {dish.tags.map((t) => (
+              <span key={t} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: tagTint(t) }}>
+                <span className="h-2 w-2 rounded-full" style={{ background: tagColor(t) }} aria-hidden />
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {dish.ingredients.length > 0 && (
+          <section>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="font-semibold">Zutaten</h3>
+              <div className="flex items-center gap-2" aria-label="Portionen">
+                <button className="btn btn-icon !min-h-10 !min-w-10" aria-label="Weniger Portionen" onClick={() => setPortions((p) => Math.max(1, p - 1))}>−</button>
+                <span className="min-w-20 text-center text-sm font-medium" aria-live="polite">{portions} Portionen</span>
+                <button className="btn btn-icon !min-h-10 !min-w-10" aria-label="Mehr Portionen" onClick={() => setPortions((p) => p + 1)}>+</button>
+              </div>
+            </div>
+            {!base && <p className="muted mb-2 text-xs">Für dieses Rezept sind keine Portionen hinterlegt, die Mengen werden nicht umgerechnet.</p>}
+            <ul className="card divide-y overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+              {dish.ingredients.map((i) => (
+                <li key={i.id} className="flex items-baseline justify-between gap-3 px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                  <span>{i.name}</span>
+                  <span className="muted shrink-0 text-sm">
+                    {i.qty !== undefined ? `${formatNumber(i.qty * factor)}${i.unit ? ` ${i.unit}` : ''}` : i.unit ?? ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {dish.steps && (
+          <section>
+            <h3 className="mb-1 font-semibold">Zubereitung</h3>
+            <p className="whitespace-pre-line leading-relaxed">{dish.steps}</p>
+          </section>
+        )}
+
+        {dish.notes && (
+          <section>
+            <h3 className="mb-1 font-semibold">Notizen</h3>
+            <p className="muted whitespace-pre-line">{dish.notes}</p>
+          </section>
+        )}
+
+        {!hasRecipe && !dish.notes && <p className="muted">Für dieses Menü ist noch kein Rezept hinterlegt.</p>}
+
+        <Link to={`/menus?edit=${dish.id}`} className="btn" onClick={onClose}>
+          {hasRecipe ? 'Rezept bearbeiten' : 'Rezept ergänzen'}
+        </Link>
+      </div>
+    </Sheet>
+  )
+}
+
 function EntrySheet({ entry, dish, week, onClose }: { entry: PlanEntry; dish?: Dish; week: string[]; onClose: () => void }) {
   const [picking, setPicking] = useState(false)
+  const [viewing, setViewing] = useState(false)
   const [target, setTarget] = useState(`${entry.date}|${entry.slot}`)
 
   if (picking) {
@@ -88,9 +158,15 @@ function EntrySheet({ entry, dish, week, onClose }: { entry: PlanEntry; dish?: D
       />
     )
   }
+  if (viewing && dish) return <RecipeSheet dish={dish} servings={entry.servings} onClose={() => setViewing(false)} />
   return (
     <Sheet title={dish?.name ?? 'Eintrag'} onClose={onClose}>
       <div className="flex flex-col gap-4">
+        {dish && (
+          <button className="btn btn-primary" onClick={() => setViewing(true)}>
+            📖 Rezept ansehen
+          </button>
+        )}
         <div className="flex items-center justify-between">
           <span className="font-medium">Portionen</span>
           <div className="flex items-center gap-2">
@@ -140,7 +216,7 @@ function EntrySheet({ entry, dish, week, onClose }: { entry: PlanEntry; dish?: D
   )
 }
 
-function DishTile({ dish, planned }: { dish: Dish; planned: boolean }) {
+function DishTile({ dish, planned, onOpen }: { dish: Dish; planned: boolean; onOpen: () => void }) {
   const data: DragData = { kind: 'dish', dishId: dish.id, label: dish.name }
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `dish:${dish.id}`, data })
   const first = dish.tags[0]
@@ -149,7 +225,8 @@ function DishTile({ dish, planned }: { dish: Dish; planned: boolean }) {
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className="card group relative flex min-h-[4.25rem] touch-manipulation select-none flex-col justify-between gap-1 overflow-hidden py-2 pr-2 pl-3.5 text-left transition hover:shadow-md active:scale-[0.98]"
+      onClick={onOpen}
+      className="card group relative flex min-h-[5rem] touch-manipulation select-none flex-col justify-between gap-1 overflow-hidden py-2.5 pr-2.5 pl-4 text-left transition hover:shadow-md active:scale-[0.98]"
       style={{
         opacity: isDragging ? 0.35 : 1,
         cursor: 'grab',
@@ -158,7 +235,7 @@ function DishTile({ dish, planned }: { dish: Dish; planned: boolean }) {
       title={dish.name}
     >
       <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: first ? tagColor(first) : 'var(--border)' }} aria-hidden />
-      <span className="line-clamp-2 pr-4 text-sm leading-tight font-semibold">{dish.name}</span>
+      <span className="line-clamp-2 pr-4 text-[15px] leading-tight font-semibold">{dish.name}</span>
       <span className="muted flex items-center gap-2 text-[11px] leading-none">
         {dish.tags.length > 0 ? <TagDots tags={dish.tags} max={1} /> : <span>{dish.ingredients.length === 0 ? 'Ohne Rezept' : 'Rezept'}</span>}
         {dish.servings && <span className="shrink-0">· {dish.servings} Port.</span>}
@@ -177,16 +254,32 @@ function DishTile({ dish, planned }: { dish: Dish; planned: boolean }) {
   )
 }
 
-function Tray({ dishes, plannedIds, draggingEntry }: { dishes: Dish[]; plannedIds: Set<string>; draggingEntry: boolean }) {
+function Tray({ dishes, plannedIds, draggingEntry, onOpenDish }: { dishes: Dish[]; plannedIds: Set<string>; draggingEntry: boolean; onOpenDish: (d: Dish) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: TRAY_ID })
   const f = useDishFilter(dishes)
-  const [collapsed, setCollapsed] = useState(false)
+  const [size, setSize] = useState<0 | 1 | 2>(() => {
+    try {
+      const raw = localStorage.getItem('tray-size')
+      return raw === '0' ? 0 : raw === '2' ? 2 : 1
+    } catch {
+      return 1
+    }
+  })
+  const collapsed = size === 0
+  const changeSize = (n: 0 | 1 | 2) => {
+    setSize(n)
+    try {
+      localStorage.setItem('tray-size', String(n))
+    } catch {
+      /* Speichern ist optional */
+    }
+  }
 
   return (
     <section
       ref={setNodeRef}
       aria-label="Menüs"
-      className={`card flex shrink-0 flex-col overflow-hidden ${collapsed ? '' : 'max-h-[38%] min-h-32'}`}
+      className={`card flex shrink-0 flex-col overflow-hidden ${size === 0 ? '' : size === 1 ? 'max-h-[38%] min-h-40 md:max-h-[46%]' : 'max-h-[78%] min-h-40'}`}
       style={isOver && draggingEntry ? { outline: '2px dashed #dc2626' } : undefined}
     >
       <div className="flex items-center gap-2 px-2 pt-2 pb-1.5">
@@ -204,11 +297,21 @@ function Tray({ dishes, plannedIds, draggingEntry }: { dishes: Dish[]; plannedId
         )}
         <button
           className="btn btn-icon !min-h-10 !min-w-10 shrink-0"
-          aria-label={collapsed ? 'Menüs einblenden' : 'Menüs ausblenden'}
-          aria-expanded={!collapsed}
-          onClick={() => setCollapsed(!collapsed)}
+          aria-label="Menüliste verkleinern"
+          title="Verkleinern"
+          disabled={size === 0}
+          onClick={() => changeSize((size - 1) as 0 | 1 | 2)}
         >
-          {collapsed ? '▾' : '▴'}
+          ▴
+        </button>
+        <button
+          className="btn btn-icon !min-h-10 !min-w-10 shrink-0"
+          aria-label="Menüliste vergrössern"
+          title="Vergrössern"
+          disabled={size === 2}
+          onClick={() => changeSize((size + 1) as 0 | 1 | 2)}
+        >
+          ▾
         </button>
       </div>
 
@@ -233,7 +336,7 @@ function Tray({ dishes, plannedIds, draggingEntry }: { dishes: Dish[]; plannedId
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
                 {f.list.map((d) => (
-                  <DishTile key={d.id} dish={d} planned={plannedIds.has(d.id)} />
+                  <DishTile key={d.id} dish={d} planned={plannedIds.has(d.id)} onOpen={() => onOpenDish(d)} />
                 ))}
               </div>
             )}
@@ -254,12 +357,12 @@ function EntryChip({ entry, dish, onOpen }: { entry: PlanEntry; dish?: Dish; onO
       {...attributes}
       {...listeners}
       onClick={onOpen}
-      className="relative flex min-h-12 w-full flex-1 touch-manipulation select-none flex-col justify-between gap-1 overflow-hidden rounded-xl py-1.5 pr-2 pl-3 text-left shadow-sm transition hover:shadow-md active:scale-[0.98]"
+      className="relative flex min-h-[4.5rem] w-full flex-1 touch-manipulation select-none flex-col justify-between gap-1.5 overflow-hidden rounded-xl py-2 pr-2.5 pl-4 text-left shadow-sm xl:min-h-24 transition hover:shadow-md active:scale-[0.98]"
       style={{ background: first ? tagTint(first) : 'var(--accent-soft)', opacity: isDragging ? 0.4 : 1, cursor: 'grab' }}
     >
       <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: first ? tagColor(first) : 'var(--accent)' }} aria-hidden />
-      <span className="line-clamp-2 text-sm leading-tight font-semibold [overflow-wrap:anywhere] xl:text-[13px]">{dish?.name ?? '(gelöscht)'}</span>
-      <span className="muted flex items-center gap-1 text-[11px] leading-none">
+      <span className="line-clamp-2 text-[15px] leading-tight font-semibold [overflow-wrap:anywhere] xl:text-[15px]">{dish?.name ?? '(gelöscht)'}</span>
+      <span className="muted flex items-center gap-1 text-xs leading-none">
         <span aria-hidden>👥</span>
         {entry.servings} Port.
       </span>
@@ -299,7 +402,7 @@ function SlotCell({
         <EntryChip entry={entry} dish={dish} onOpen={onOpen} />
       ) : (
         <button
-          className={`flex min-h-12 w-full flex-1 items-center justify-center rounded-xl border-2 border-dashed text-xl font-light transition hover:bg-[var(--accent-soft)] ${
+          className={`flex min-h-[4.5rem] w-full flex-1 items-center justify-center rounded-xl border-2 border-dashed text-2xl font-light xl:min-h-24 transition hover:bg-[var(--accent-soft)] ${
             dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'muted'
           }`}
           style={dragging ? undefined : { borderColor: 'var(--border)' }}
@@ -318,6 +421,7 @@ export default function PlanPage() {
   const [adding, setAdding] = useState<{ date: string; slot: Slot } | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [dragging, setDragging] = useState<DragData | null>(null)
+  const [recipeDish, setRecipeDish] = useState<Dish | null>(null)
   const days = useMemo(() => weekDays(weekStart), [weekStart])
   const today = todayISO()
 
@@ -350,7 +454,7 @@ export default function PlanPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-6xl flex-col gap-2">
+    <div className="mx-auto flex h-full max-w-[1680px] flex-col gap-2.5">
       <div className="flex shrink-0 items-center gap-2">
         <button className="btn btn-icon" aria-label="Vorherige Woche" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
         <div className="flex-1 text-center leading-tight">
@@ -375,16 +479,16 @@ export default function PlanPage() {
       </div>
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
-        <Tray dishes={dishes ?? []} plannedIds={plannedIds} draggingEntry={dragging?.kind === 'entry'} />
+        <Tray dishes={dishes ?? []} plannedIds={plannedIds} draggingEntry={dragging?.kind === 'entry'} onOpenDish={setRecipeDish} />
 
-        <div className="muted grid shrink-0 grid-cols-[3.25rem_1fr_1fr] gap-1 px-1 text-center text-[11px] xl:hidden" aria-hidden>
+        <div className="muted grid shrink-0 grid-cols-[3.5rem_1fr_1fr] gap-1.5 px-1.5 text-center text-xs xl:hidden" aria-hidden>
           <span />
           <span>{SLOT_ICON.lunch} {SLOT_SHORT.lunch}</span>
           <span>{SLOT_ICON.dinner} {SLOT_SHORT.dinner}</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 gap-2 pb-2 xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-2.5 pb-2 xl:grid-cols-7 xl:gap-3">
             {days.map((d) => {
               const p = dayParts(d)
               const isToday = d === today
@@ -393,7 +497,7 @@ export default function PlanPage() {
               return (
                 <section
                   key={d}
-                  className="card grid grid-cols-[3.25rem_1fr_1fr] gap-1 overflow-hidden p-1 transition xl:grid-cols-1 xl:content-start xl:gap-1.5 xl:p-1.5"
+                  className="card grid grid-cols-[3.5rem_1fr_1fr] gap-1.5 overflow-hidden p-1.5 transition xl:grid-cols-1 xl:content-start xl:gap-2 xl:p-2"
                   style={{
                     opacity: isPast ? 0.72 : 1,
                     background: weekend ? 'color-mix(in srgb, var(--accent-soft) 35%, var(--surface))' : undefined,
@@ -457,6 +561,7 @@ export default function PlanPage() {
           }}
         />
       )}
+      {recipeDish && <RecipeSheet dish={recipeDish} onClose={() => setRecipeDish(null)} />}
       {open && <EntrySheet entry={open} dish={dishMap.get(open.dishId)} week={days} onClose={() => setOpenId(null)} />}
     </div>
   )

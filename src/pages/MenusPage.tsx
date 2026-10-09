@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../data/db'
 import { deleteDish, newId, saveDish } from '../data/repo'
@@ -165,6 +166,16 @@ export default function MenusPage() {
   const [query, setQuery] = useState('')
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [editing, setEditing] = useState<Dish | 'new' | null>(null)
+  const [params, setParams] = useSearchParams()
+
+  // Aus dem Plan verlinkt: /menus?edit=<id> öffnet direkt das Bearbeiten-Formular.
+  useEffect(() => {
+    const id = params.get('edit')
+    if (!id || !dishes) return
+    const dish = dishes.find((d) => d.id === id)
+    if (dish) setEditing(dish)
+    setParams({}, { replace: true })
+  }, [params, dishes, setParams])
 
   const allTags = useMemo(() => [...new Set((dishes ?? []).flatMap((d) => d.tags))].sort(), [dishes])
   const filtered = useMemo(() => {

@@ -16,7 +16,7 @@ const tabs = [
 
 export default function App() {
   return (
-    <div className="mx-auto flex h-full max-w-6xl flex-col md:flex-row">
+    <div className="mx-auto flex h-full max-w-[1920px] flex-col md:flex-row">
       <nav
         aria-label="Hauptnavigation"
         className="card order-2 grid grid-cols-4 rounded-b-none border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] md:order-1 md:my-4 md:ml-4 md:flex md:w-48 md:flex-col md:gap-1 md:self-start md:rounded-2xl md:border md:p-2"
