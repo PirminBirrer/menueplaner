@@ -20,10 +20,11 @@ import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
 import { TagDots, TagFilter, useDishFilter } from '../components/DishFilter'
 import { tagColor, tagTint } from '../lib/tags'
-import { addDays, dayParts, formatDay, formatRange, isoWeek, startOfWeek, todayISO, weekDays } from '../lib/dates'
+import { addDays, dayParts, formatDay, fromISO, formatRange, isoWeek, startOfWeek, todayISO, weekDays } from '../lib/dates'
 
 const SLOTS: Slot[] = ['lunch', 'dinner']
 const SLOT_SHORT: Record<Slot, string> = { lunch: 'Mittag', dinner: 'Abend' }
+const SLOT_ICON: Record<Slot, string> = { lunch: '☀️', dinner: '🌙' }
 const TRAY_ID = 'tray'
 
 type DragData = { kind: 'dish'; dishId: string; label: string } | { kind: 'entry'; label: string }
@@ -246,31 +247,62 @@ function Tray({ dishes, plannedIds, draggingEntry }: { dishes: Dish[]; plannedId
 function EntryChip({ entry, dish, onOpen }: { entry: PlanEntry; dish?: Dish; onOpen: () => void }) {
   const data: DragData = { kind: 'entry', label: dish?.name ?? 'Eintrag' }
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: entry.id, data })
+  const first = dish?.tags[0]
   return (
     <button
       ref={setNodeRef}
       {...attributes}
       {...listeners}
       onClick={onOpen}
-      className="min-h-12 w-full touch-manipulation select-none rounded-xl px-2 py-1.5 text-left"
-      style={{ background: 'var(--accent-soft)', opacity: isDragging ? 0.4 : 1 }}
+      className="relative flex min-h-12 w-full flex-1 touch-manipulation select-none flex-col justify-between gap-1 overflow-hidden rounded-xl py-1.5 pr-2 pl-3 text-left shadow-sm transition hover:shadow-md active:scale-[0.98]"
+      style={{ background: first ? tagTint(first) : 'var(--accent-soft)', opacity: isDragging ? 0.4 : 1, cursor: 'grab' }}
     >
-      <span className="line-clamp-2 text-sm leading-tight font-medium [overflow-wrap:anywhere] lg:text-[13px]">{dish?.name ?? '(gelöscht)'}</span>
-      <span className="muted text-[11px]">{entry.servings} Port.</span>
+      <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: first ? tagColor(first) : 'var(--accent)' }} aria-hidden />
+      <span className="line-clamp-2 text-sm leading-tight font-semibold [overflow-wrap:anywhere] xl:text-[13px]">{dish?.name ?? '(gelöscht)'}</span>
+      <span className="muted flex items-center gap-1 text-[11px] leading-none">
+        <span aria-hidden>👥</span>
+        {entry.servings} Port.
+      </span>
     </button>
   )
 }
 
-function SlotCell({ date, slot, entry, dish, onAdd, onOpen }: { date: string; slot: Slot; entry?: PlanEntry; dish?: Dish; onAdd: () => void; onOpen: () => void }) {
+function SlotCell({
+  date,
+  slot,
+  entry,
+  dish,
+  dragging,
+  onAdd,
+  onOpen,
+}: {
+  date: string
+  slot: Slot
+  entry?: PlanEntry
+  dish?: Dish
+  dragging: boolean
+  onAdd: () => void
+  onOpen: () => void
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: `${date}|${slot}` })
   return (
-    <div ref={setNodeRef} className="flex flex-col rounded-xl p-0.5" style={isOver ? { outline: '2px dashed var(--accent)' } : undefined}>
-      <div className="muted hidden px-1 text-[11px] lg:block">{SLOT_SHORT[slot]}</div>
+    <div
+      ref={setNodeRef}
+      className="flex min-w-0 flex-col rounded-xl p-0.5 transition"
+      style={isOver ? { outline: '2px solid var(--accent)', outlineOffset: '-1px', background: 'var(--accent-soft)' } : undefined}
+    >
+      <div className="muted hidden items-center gap-1 px-1 pb-0.5 text-[11px] font-medium xl:flex">
+        <span aria-hidden>{SLOT_ICON[slot]}</span>
+        {SLOT_SHORT[slot]}
+      </div>
       {entry ? (
         <EntryChip entry={entry} dish={dish} onOpen={onOpen} />
       ) : (
         <button
-          className="btn min-h-12 w-full flex-1 border-dashed px-1 text-lg font-normal muted"
+          className={`flex min-h-12 w-full flex-1 items-center justify-center rounded-xl border-2 border-dashed text-xl font-light transition hover:bg-[var(--accent-soft)] ${
+            dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'muted'
+          }`}
+          style={dragging ? undefined : { borderColor: 'var(--border)' }}
           onClick={onAdd}
           aria-label={`${SLOT_LABELS[slot]} hinzufügen`}
         >
@@ -324,6 +356,18 @@ export default function PlanPage() {
         <div className="flex-1 text-center leading-tight">
           <h1 className="text-lg font-bold">KW {isoWeek(weekStart)}</h1>
           <p className="muted text-xs whitespace-nowrap">{formatRange(days[0], days[6])}</p>
+          <div
+            className="mx-auto mt-1 h-1.5 w-28 overflow-hidden rounded-full"
+            style={{ background: 'var(--border)' }}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={14}
+            aria-valuenow={entries?.length ?? 0}
+            aria-label="Geplante Mahlzeiten"
+            title={`${entries?.length ?? 0} von 14 Mahlzeiten geplant`}
+          >
+            <div className="h-full rounded-full transition-all" style={{ width: `${((entries?.length ?? 0) / 14) * 100}%`, background: 'var(--accent)' }} />
+          </div>
         </div>
         <button className="chip" onClick={() => setWeekStart(startOfWeek(todayISO()))}>Heute</button>
         <Link to={`/plan/druck?from=${days[0]}&to=${days[6]}`} className="chip !px-2.5" aria-label="Wochenplan drucken" title="Drucken">🖨️</Link>
@@ -333,25 +377,46 @@ export default function PlanPage() {
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <Tray dishes={dishes ?? []} plannedIds={plannedIds} draggingEntry={dragging?.kind === 'entry'} />
 
-        <div className="muted grid shrink-0 grid-cols-[3.25rem_1fr_1fr] gap-1 px-1 text-center text-[11px] lg:hidden" aria-hidden>
+        <div className="muted grid shrink-0 grid-cols-[3.25rem_1fr_1fr] gap-1 px-1 text-center text-[11px] xl:hidden" aria-hidden>
           <span />
-          <span>{SLOT_SHORT.lunch}</span>
-          <span>{SLOT_SHORT.dinner}</span>
+          <span>{SLOT_ICON.lunch} {SLOT_SHORT.lunch}</span>
+          <span>{SLOT_ICON.dinner} {SLOT_SHORT.dinner}</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 gap-1.5 pb-2 lg:grid-cols-7 lg:items-start">
+          <div className="grid grid-cols-1 gap-2 pb-2 xl:grid-cols-7">
             {days.map((d) => {
               const p = dayParts(d)
+              const isToday = d === today
+              const isPast = d < today
+              const weekend = [0, 6].includes(fromISO(d).getDay())
               return (
                 <section
                   key={d}
-                  className="card grid grid-cols-[3.25rem_1fr_1fr] gap-1 p-1 lg:grid-cols-1"
-                  style={d === today ? { borderColor: 'var(--accent)', borderWidth: 2 } : undefined}
+                  className="card grid grid-cols-[3.25rem_1fr_1fr] gap-1 overflow-hidden p-1 transition xl:grid-cols-1 xl:content-start xl:gap-1.5 xl:p-1.5"
+                  style={{
+                    opacity: isPast ? 0.72 : 1,
+                    background: weekend ? 'color-mix(in srgb, var(--accent-soft) 35%, var(--surface))' : undefined,
+                    ...(isToday ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px var(--accent)' } : {}),
+                  }}
+                  aria-label={isToday ? `${p.weekday} ${p.date}, heute` : `${p.weekday} ${p.date}`}
                 >
-                  <h2 className="flex flex-col justify-center px-1 leading-tight lg:flex-row lg:items-baseline lg:gap-2">
-                    <span className="text-sm font-semibold">{p.weekday}</span>
-                    <span className="muted text-xs">{p.date}</span>
+                  <h2 className="flex flex-col items-center justify-center leading-none xl:flex-row xl:justify-start xl:gap-2 xl:px-1 xl:pt-0.5">
+                    <span className={`text-[10px] font-bold tracking-wider uppercase xl:text-[11px] ${isToday ? 'text-[var(--accent)]' : 'muted'}`}>
+                      {p.weekday.replace('.', '')}
+                    </span>
+                    <span
+                      className={`mt-0.5 flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-base font-bold xl:mt-0 ${
+                        isToday ? 'bg-[var(--accent)] text-white' : ''
+                      }`}
+                    >
+                      {fromISO(d).getDate()}
+                    </span>
+                    {isToday && (
+                      <span className="ml-auto hidden rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white xl:inline" style={{ background: 'var(--accent)' }}>
+                        Heute
+                      </span>
+                    )}
                   </h2>
                   {SLOTS.map((slot) => {
                     const entry = entries?.find((e) => e.date === d && e.slot === slot)
@@ -362,6 +427,7 @@ export default function PlanPage() {
                         slot={slot}
                         entry={entry}
                         dish={entry && dishMap.get(entry.dishId)}
+                        dragging={dragging !== null}
                         onAdd={() => setAdding({ date: d, slot })}
                         onOpen={() => entry && setOpenId(entry.id)}
                       />
