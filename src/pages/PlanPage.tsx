@@ -18,6 +18,8 @@ import { assignDish, moveEntry, removePlanEntry, setPlanServings } from '../data
 import { SLOT_LABELS, type Dish, type PlanEntry, type Slot } from '../data/types'
 import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
+import { TagDots, TagFilter, useDishFilter } from '../components/DishFilter'
+import { tagColor, tagTint } from '../lib/tags'
 import { addDays, dayParts, formatDay, formatRange, isoWeek, startOfWeek, todayISO, weekDays } from '../lib/dates'
 
 const SLOTS: Slot[] = ['lunch', 'dinner']
@@ -28,8 +30,7 @@ type DragData = { kind: 'dish'; dishId: string; label: string } | { kind: 'entry
 
 function DishPicker({ onPick, onClose }: { onPick: (d: Dish) => void; onClose: () => void }) {
   const dishes = useLiveQuery(() => db.dishes.orderBy('name').toArray(), [])
-  const [q, setQ] = useState('')
-  const list = (dishes ?? []).filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const f = useDishFilter(dishes ?? [])
   return (
     <Sheet title="Menü wählen" onClose={onClose}>
       {dishes && dishes.length === 0 ? (
@@ -38,17 +39,32 @@ function DishPicker({ onPick, onClose }: { onPick: (d: Dish) => void; onClose: (
         </EmptyState>
       ) : (
         <>
-          <input className="input mb-3" type="search" autoFocus placeholder="Suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input mb-2" type="search" autoFocus placeholder="Suchen…" value={f.q} onChange={(e) => f.setQ(e.target.value)} />
+          <div className="mb-3">
+            <TagFilter tags={f.tags} active={f.active} onToggle={f.toggle} onClear={f.clear} />
+          </div>
           <ul className="flex flex-col gap-2">
-            {list.map((d) => (
+            {f.list.map((d) => (
               <li key={d.id}>
-                <button className="card min-h-14 w-full px-4 py-3 text-left font-medium" onClick={() => onPick(d)}>
-                  {d.name}
-                  {d.tags.length > 0 && <span className="muted ml-2 text-xs">{d.tags.join(' · ')}</span>}
+                <button
+                  className="card relative flex min-h-14 w-full flex-col justify-center overflow-hidden py-2.5 pr-4 pl-5 text-left"
+                  onClick={() => onPick(d)}
+                >
+                  <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: d.tags[0] ? tagColor(d.tags[0]) : 'var(--border)' }} aria-hidden />
+                  <span className="font-semibold">{d.name}</span>
+                  <span className="muted flex items-center gap-2 text-xs">
+                    <TagDots tags={d.tags} max={3} />
+                    {d.ingredients.length === 0 && <span>Ohne Rezept</span>}
+                  </span>
                 </button>
               </li>
             ))}
-            {list.length === 0 && <p className="muted py-6 text-center">Keine Treffer.</p>}
+            {f.list.length === 0 && (
+              <div className="py-6 text-center">
+                <p className="muted mb-2">Keine Treffer.</p>
+                <button className="btn" onClick={f.clear}>Filter zurücksetzen</button>
+              </div>
+            )}
           </ul>
         </>
       )}
@@ -123,63 +139,106 @@ function EntrySheet({ entry, dish, week, onClose }: { entry: PlanEntry; dish?: D
   )
 }
 
-function DishTile({ dish }: { dish: Dish }) {
+function DishTile({ dish, planned }: { dish: Dish; planned: boolean }) {
   const data: DragData = { kind: 'dish', dishId: dish.id, label: dish.name }
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `dish:${dish.id}`, data })
+  const first = dish.tags[0]
   return (
     <button
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className="card min-h-12 touch-manipulation select-none px-2.5 py-2 text-left text-sm leading-tight font-medium"
-      style={{ opacity: isDragging ? 0.4 : 1, cursor: 'grab' }}
+      className="card group relative flex min-h-[4.25rem] touch-manipulation select-none flex-col justify-between gap-1 overflow-hidden py-2 pr-2 pl-3.5 text-left transition hover:shadow-md active:scale-[0.98]"
+      style={{
+        opacity: isDragging ? 0.35 : 1,
+        cursor: 'grab',
+        background: first ? tagTint(first) : undefined,
+      }}
       title={dish.name}
     >
-      <span className="line-clamp-2">{dish.name}</span>
+      <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: first ? tagColor(first) : 'var(--border)' }} aria-hidden />
+      <span className="line-clamp-2 pr-4 text-sm leading-tight font-semibold">{dish.name}</span>
+      <span className="muted flex items-center gap-2 text-[11px] leading-none">
+        {dish.tags.length > 0 ? <TagDots tags={dish.tags} max={1} /> : <span>{dish.ingredients.length === 0 ? 'Ohne Rezept' : 'Rezept'}</span>}
+        {dish.servings && <span className="shrink-0">· {dish.servings} Port.</span>}
+      </span>
+      {planned && (
+        <span
+          className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-white"
+          style={{ background: 'var(--accent)' }}
+          title="In dieser Woche bereits geplant"
+          aria-label="In dieser Woche bereits geplant"
+        >
+          ✓
+        </span>
+      )}
     </button>
   )
 }
 
-function Tray({ dishes, draggingEntry }: { dishes: Dish[]; draggingEntry: boolean }) {
+function Tray({ dishes, plannedIds, draggingEntry }: { dishes: Dish[]; plannedIds: Set<string>; draggingEntry: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: TRAY_ID })
-  const [q, setQ] = useState('')
-  const list = dishes.filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const f = useDishFilter(dishes)
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
     <section
       ref={setNodeRef}
       aria-label="Menüs"
-      className="card flex max-h-[30%] min-h-28 shrink-0 flex-col overflow-hidden"
+      className={`card flex shrink-0 flex-col overflow-hidden ${collapsed ? '' : 'max-h-[38%] min-h-32'}`}
       style={isOver && draggingEntry ? { outline: '2px dashed #dc2626' } : undefined}
     >
-      <div className="flex items-center gap-2 px-2 pt-2 pb-1">
-        <input
-          className="input !min-h-10 py-1"
-          type="search"
-          placeholder={`Menüs durchsuchen (${dishes.length})…`}
-          aria-label="Menüs durchsuchen"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
-      <div className="overflow-y-auto px-2 pb-2">
-        {draggingEntry ? (
-          <p className="muted py-4 text-center text-sm">Hierher ziehen, um den Eintrag zu entfernen</p>
-        ) : dishes.length === 0 ? (
-          <div className="py-3 text-center text-sm">
-            <p className="muted mb-2">Noch keine Menüs vorhanden.</p>
-            <Link to="/menus" className="btn btn-primary">Menüs anlegen</Link>
-          </div>
-        ) : list.length === 0 ? (
-          <p className="muted py-4 text-center text-sm">Keine Treffer.</p>
+      <div className="flex items-center gap-2 px-2 pt-2 pb-1.5">
+        {collapsed ? (
+          <span className="flex-1 px-1 font-semibold">Menüs <span className="muted font-normal">({dishes.length})</span></span>
         ) : (
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-            {list.map((d) => (
-              <DishTile key={d.id} dish={d} />
-            ))}
-          </div>
+          <input
+            className="input !min-h-10 py-1"
+            type="search"
+            placeholder={`Menü suchen (${dishes.length})…`}
+            aria-label="Menüs durchsuchen"
+            value={f.q}
+            onChange={(e) => f.setQ(e.target.value)}
+          />
         )}
+        <button
+          className="btn btn-icon !min-h-10 !min-w-10 shrink-0"
+          aria-label={collapsed ? 'Menüs einblenden' : 'Menüs ausblenden'}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? '▾' : '▴'}
+        </button>
       </div>
+
+      {!collapsed && (
+        <>
+          <div className="px-2">
+            <TagFilter tags={f.tags} active={f.active} onToggle={f.toggle} onClear={f.clear} />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
+            {draggingEntry ? (
+              <p className="muted py-4 text-center text-sm">Hierher ziehen, um den Eintrag zu entfernen</p>
+            ) : dishes.length === 0 ? (
+              <div className="py-3 text-center text-sm">
+                <p className="muted mb-2">Noch keine Menüs vorhanden.</p>
+                <Link to="/menus" className="btn btn-primary">Menüs anlegen</Link>
+              </div>
+            ) : f.list.length === 0 ? (
+              <div className="py-3 text-center text-sm">
+                <p className="muted mb-2">Keine Treffer.</p>
+                <button className="btn !min-h-10" onClick={f.clear}>Filter zurücksetzen</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+                {f.list.map((d) => (
+                  <DishTile key={d.id} dish={d} planned={plannedIds.has(d.id)} />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -196,7 +255,7 @@ function EntryChip({ entry, dish, onOpen }: { entry: PlanEntry; dish?: Dish; onO
       className="min-h-12 w-full touch-manipulation select-none rounded-xl px-2 py-1.5 text-left"
       style={{ background: 'var(--accent-soft)', opacity: isDragging ? 0.4 : 1 }}
     >
-      <span className="line-clamp-2 text-sm leading-tight font-medium">{dish?.name ?? '(gelöscht)'}</span>
+      <span className="line-clamp-2 text-sm leading-tight font-medium [overflow-wrap:anywhere] lg:text-[13px]">{dish?.name ?? '(gelöscht)'}</span>
       <span className="muted text-[11px]">{entry.servings} Port.</span>
     </button>
   )
@@ -234,6 +293,7 @@ export default function PlanPage() {
   const dishes = useLiveQuery(() => db.dishes.orderBy('name').toArray(), [])
   const dishMap = useMemo(() => new Map((dishes ?? []).map((d) => [d.id, d])), [dishes])
   const open = entries?.find((e) => e.id === openId)
+  const plannedIds = useMemo(() => new Set((entries ?? []).map((e) => e.dishId)), [entries])
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -271,7 +331,7 @@ export default function PlanPage() {
       </div>
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
-        <Tray dishes={dishes ?? []} draggingEntry={dragging?.kind === 'entry'} />
+        <Tray dishes={dishes ?? []} plannedIds={plannedIds} draggingEntry={dragging?.kind === 'entry'} />
 
         <div className="muted grid shrink-0 grid-cols-[3.25rem_1fr_1fr] gap-1 px-1 text-center text-[11px] lg:hidden" aria-hidden>
           <span />
@@ -315,7 +375,7 @@ export default function PlanPage() {
 
         <DragOverlay dropAnimation={null}>
           {dragging && (
-            <div className="card px-3 py-2 text-sm font-medium shadow-xl" style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)' }}>
+            <div className="card rotate-2 px-4 py-2.5 text-sm font-semibold shadow-2xl" style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)' }}>
               {dragging.label}
             </div>
           )}
