@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --text: #1c1f1d;
+  --muted: #6b726d;
+  --border: #e2e5e1;
+  --accent: #16a34a;
+  --accent-soft: #dcfce7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111412;
+    --surface: #1b1f1c;
+    --text: #eceeec;
+    --muted: #9aa39c;
+    --border: #2d332f;
+    --accent: #22c55e;
+    --accent-soft: #163321;
+  }
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; }
+  .muted { color: var(--muted); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+    min-height: 48px; padding: 0 1.1rem; border-radius: .85rem; font-weight: 600;
+    border: 1px solid var(--border); background: var(--surface); cursor: pointer;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-danger { color: #dc2626; }
+  .btn-icon { min-width: 48px; padding: 0; }
+  .input {
+    width: 100%; min-height: 48px; padding: .6rem .85rem; border-radius: .85rem;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  }
+  .input:focus, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chip {
+    display: inline-flex; align-items: center; min-height: 36px; padding: 0 .85rem;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+    font-size: .875rem; cursor: pointer;
+  }
+  .chip[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
+}
