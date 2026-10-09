@@ -13,6 +13,7 @@ import {
 import type { Category, ShopItem } from '../data/types'
 import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
+import UnitSelect from '../components/UnitSelect'
 import { addDays, startOfWeek, todayISO } from '../lib/dates'
 import { formatNumber, formatQuantity, parseIngredientLine, toBase } from '../lib/units'
 
@@ -80,7 +81,7 @@ function ItemSheet({ item, categories, onClose }: { item: ShopItem; categories: 
         <label className="flex flex-col gap-1 text-sm font-medium">Name<input className="input" required value={name} onChange={(e) => setName(e.target.value)} /></label>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-sm font-medium">Menge<input className="input" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></label>
-          <label className="flex flex-col gap-1 text-sm font-medium">Einheit<input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-sm font-medium">Einheit<UnitSelect value={unit} onChange={setUnit} /></label>
         </div>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Kategorie (wird gemerkt)

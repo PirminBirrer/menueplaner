@@ -44,3 +44,12 @@ export function isoWeek(iso: string): number {
   const week1 = new Date(d.getFullYear(), 0, 4)
   return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
 }
+
+/** Wochentag-Kürzel und Datum getrennt, z. B. { weekday: 'Mo.', date: '5.10.' }. */
+export function dayParts(iso: string): { weekday: string; date: string } {
+  const d = fromISO(iso)
+  return {
+    weekday: d.toLocaleDateString('de-CH', { weekday: 'short' }),
+    date: d.toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric' }),
+  }
+}

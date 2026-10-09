@@ -5,23 +5,43 @@ import { deleteDish, newId, saveDish } from '../data/repo'
 import type { Dish } from '../data/types'
 import Sheet from '../components/Sheet'
 import EmptyState from '../components/EmptyState'
-import { parseIngredientLine } from '../lib/units'
+import UnitSelect, { DEFAULT_UNIT } from '../components/UnitSelect'
 import { SAMPLE_DISHES } from '../data/samples'
 
-const ingredientsToText = (d?: Dish) =>
-  (d?.ingredients ?? [])
-    .map((i) => [i.qty !== undefined ? i.qty.toString().replace('.', ',') : '', i.unit ?? '', i.name].filter(Boolean).join(' '))
-    .join('\n')
+interface Row {
+  key: string
+  qty: string
+  unit: string // '' = Anzahl
+  name: string
+}
+
+const toRows = (d?: Dish): Row[] =>
+  (d?.ingredients ?? []).map((i) => ({
+    key: i.id || newId(),
+    qty: i.qty !== undefined ? String(i.qty).replace('.', ',') : '',
+    unit: i.unit ?? '',
+    name: i.name,
+  }))
 
 function DishForm({ dish, onClose }: { dish?: Dish; onClose: () => void }) {
   const [name, setName] = useState(dish?.name ?? '')
   const [servings, setServings] = useState(dish?.servings?.toString() ?? '')
   const [tags, setTags] = useState(dish?.tags.join(', ') ?? '')
-  const [ingredients, setIngredients] = useState(ingredientsToText(dish))
+  const [rows, setRows] = useState<Row[]>(() => toRows(dish))
+  const [focusKey, setFocusKey] = useState<string | null>(null)
   const [steps, setSteps] = useState(dish?.steps ?? '')
   const [notes, setNotes] = useState(dish?.notes ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const hasRecipe = !!(dish?.ingredients.length || dish?.steps || dish?.servings)
+
+  const patchRow = (key: string, patch: Partial<Row>) =>
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+
+  function addRow() {
+    const key = newId()
+    setRows((rs) => [...rs, { key, qty: '', unit: DEFAULT_UNIT, name: '' }])
+    setFocusKey(key)
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -32,11 +52,13 @@ function DishForm({ dish, onClose }: { dish?: Dish; onClose: () => void }) {
       name: name.trim(),
       servings: s > 0 ? s : undefined,
       tags: [...new Set(tags.split(',').map((t) => t.trim()).filter(Boolean))],
-      ingredients: ingredients
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((l) => ({ id: newId(), ...parseIngredientLine(l) })),
+      ingredients: rows
+        .filter((r) => r.name.trim())
+        .map((r) => {
+          const q = Number(r.qty.replace(',', '.'))
+          const qty = r.qty.trim() && Number.isFinite(q) && q > 0 ? q : undefined
+          return { id: r.key, qty, unit: qty !== undefined && r.unit ? r.unit : undefined, name: r.name.trim() }
+        }),
       steps: steps.trim() || undefined,
       notes: notes.trim() || undefined,
     })
@@ -62,10 +84,47 @@ function DishForm({ dish, onClose }: { dish?: Dish; onClose: () => void }) {
               Portionen
               <input className="input" inputMode="decimal" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="z. B. 4" />
             </label>
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Zutaten (eine pro Zeile: Menge, Einheit, Zutat)
-              <textarea className="input min-h-32" value={ingredients} onChange={(e) => setIngredients(e.target.value)} placeholder={'200 g Spaghetti\n2 EL Olivenöl\n1 Zwiebel'} />
-            </label>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium">Zutaten</legend>
+              {rows.map((r) => (
+                <div key={r.key} className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:grid-cols-[5rem_8rem_1fr_auto]">
+                  <input
+                    className="input col-span-3 sm:order-3 sm:col-span-1"
+                    placeholder="Was? z. B. Milch"
+                    aria-label="Zutat"
+                    autoFocus={r.key === focusKey}
+                    value={r.name}
+                    onChange={(e) => patchRow(r.key, { name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (r.name.trim()) addRow()
+                      }
+                    }}
+                  />
+                  <input
+                    className="input sm:order-1"
+                    inputMode="decimal"
+                    placeholder="Menge"
+                    aria-label="Menge"
+                    value={r.qty}
+                    onChange={(e) => patchRow(r.key, { qty: e.target.value })}
+                  />
+                  <UnitSelect className="sm:order-2" value={r.unit} onChange={(unit) => patchRow(r.key, { unit })} />
+                  <button
+                    type="button"
+                    className="btn btn-icon btn-danger sm:order-4"
+                    aria-label="Zutat entfernen"
+                    onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button type="button" className="btn self-start" onClick={addRow}>
+                + Zutat
+              </button>
+            </fieldset>
             <label className="flex flex-col gap-1 text-sm font-medium">
               Zubereitung
               <textarea className="input min-h-28" value={steps} onChange={(e) => setSteps(e.target.value)} />
