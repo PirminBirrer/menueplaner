@@ -45,3 +45,7 @@ Ein späterer Sync/Backend ersetzt nur `src/data/repo.ts`; IDs sind UUIDs und al
 - Menüs ohne Rezept erscheinen mit ihrem Namen.
 - Erneutes Erzeugen behält manuelle Artikel, Abhak-Status und manuell geänderte Mengen; nicht mehr benötigte, nicht abgehakte Plan-Einträge werden entfernt.
 - Die Kategorie einer Zutat wird beim Ändern gemerkt.
+
+## Icons
+
+Die PNG-Icons werden aus `public/icon.svg` erzeugt (`node scripts/make-icons.mjs`). Zum Anpassen das SVG ersetzen und das Skript erneut ausführen.
